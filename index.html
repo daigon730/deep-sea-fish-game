@@ -198,6 +198,20 @@
   .result-hero h2{font-family:"Zen Maru Gothic",sans-serif;font-size:clamp(28px,6vw,44px);margin:8px 0 2px;font-weight:900;}
   .result-score{font-size:clamp(52px,12vw,84px);font-weight:900;color:var(--gold);line-height:1.1;text-shadow:0 4px 0 #6b4a00;}
   .result-score small{font-size:20px;color:var(--muted);}
+  .result-rank{margin:14px auto 0;display:inline-block;background:linear-gradient(180deg,#ffcf3f,#ff9d2e);color:#4a2c00;
+    font-weight:900;font-size:clamp(20px,4.6vw,30px);letter-spacing:.04em;padding:10px 28px;border-radius:999px;
+    box-shadow:0 5px 0 #a86e00,0 10px 22px rgba(0,0,0,.35);}
+  .result-rank .rk-lb{font-size:13px;font-weight:800;letter-spacing:.14em;display:block;margin-bottom:1px;}
+  .result-next{margin-top:10px;color:var(--muted);font-size:14px;font-weight:700;}
+  .result-next b{color:#7ce7ff;}
+  /* 通り名一覧 (スタート画面) */
+  .title-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  @media(max-width:640px){.title-list{grid-template-columns:1fr;}}
+  .title-list li{display:flex;align-items:center;gap:10px;background:#08304f;border-radius:10px;padding:7px 12px;font-weight:700;}
+  .title-list .t-no{width:24px;height:24px;border-radius:50%;background:#0d4a73;color:#bfe6ff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none;}
+  .title-list li.top .t-no{background:var(--gold);color:#4a3200;}
+  .title-list .t-nm{flex:1;}
+  .title-list .t-sc{color:var(--gold);font-size:13px;white-space:nowrap;}
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px;}
   @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr);}}
   .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center;}
@@ -277,6 +291,11 @@
     <div class="gold-note">✨ <b>金のタカエビ</b>：たまに流れてくる特別なタカエビ。正しく仕分けると<b>大漁モード</b>に突入！ 一定時間、魚がどんどん流れてきて大量得点のチャンス。</div>
 
     <div class="panel">
+      <h2>🎖️ 通り名（スコアで昇格）</h2>
+      <ul class="title-list" id="titleList"></ul>
+    </div>
+
+    <div class="panel">
       <h2>🏆 この端末のランキング（上位5件）</h2>
       <ol class="rank-list" id="rankStart"></ol>
       <div class="rank-empty" id="rankStartEmpty">まだ記録がありません。最初の漁師になろう！</div>
@@ -339,6 +358,8 @@
       <div class="fin">— 60秒 終了！ おつかれさまでした —</div>
       <h2>今日の漁の結果</h2>
       <div class="result-score"><span id="finalScore">0</span><small> 点</small></div>
+      <div><span class="result-rank"><span class="rk-lb">通り名</span><span id="finalRank">—</span></span></div>
+      <div class="result-next" id="finalNext"></div>
     </div>
     <div class="stats">
       <div class="stat"><div class="lb">仕分けた数</div><div class="vl" id="stSorted">0</div></div>
@@ -391,6 +412,41 @@
 var TYPES = ["takaebi","akakasago","sumikuiuo"];
 var NAMES = {takaebi:"タカエビ", akakasago:"アカカサゴ", sumikuiuo:"スミクイウオ", gold:"金のタカエビ"};
 var GAME_TIME = 60;
+
+/* ---------------- 通り名 (スコアランク) ----------------
+   基礎点100点×コンボ倍率 (×1〜×5)、金のタカエビ300点で、60秒のプレイで
+   現実的に出るスコア幅に9段階が分散するよう境目を設定した。
+   調整するときはこの配列の min だけを変えればよい (低い順に並べること)。
+   結果画面・スタート画面の一覧・Xシェア文はすべてここから生成する */
+var RANKS = [
+  {min:0,     name:"魚に逃げられる人"},
+  {min:1000,  name:"見習い漁師"},
+  {min:3000,  name:"網さばきの新人"},
+  {min:6000,  name:"深海魚ハンター"},
+  {min:10000, name:"タカエビ使い"},
+  {min:16000, name:"港の仕分け名人"},
+  {min:24000, name:"深海の覇者"},
+  {min:34000, name:"伝説の漁師"},
+  {min:45000, name:"海神の後継者"}
+];
+function rankIndexFor(scoreVal){
+  var idx = 0;
+  for(var i=0;i<RANKS.length;i++){ if(scoreVal>=RANKS[i].min) idx=i; }
+  return idx;
+}
+function renderTitleList(){
+  var el = document.getElementById("titleList");
+  if(!el) return;
+  el.innerHTML = "";
+  RANKS.forEach(function(r, i){
+    var li = document.createElement("li");
+    if(i===RANKS.length-1) li.className = "top";
+    li.innerHTML = '<span class="t-no">'+(i+1)+'</span><span class="t-nm"></span><span class="t-sc">'+
+      (r.min===0? "0 点〜" : r.min.toLocaleString()+" 点〜")+'</span>';
+    li.querySelector(".t-nm").textContent = r.name;
+    el.appendChild(li);
+  });
+}
 
 /* ---------------- Audio (Web Audio API, 外部音源なし) ---------------- */
 var AC = null, soundOn = true, bgmTimer = null, bgmStep = 0, masterGain = null;
@@ -1532,11 +1588,21 @@ function endGame(){
   sfxWhistle();
   setTimeout(function(){ [523,659,784,1046].forEach(function(f,i){ tone(f,0.25,"triangle",0.18,i*0.11); }); }, 650);
   document.getElementById("finalScore").textContent = score.toLocaleString();
+  var rankIdx = rankIndexFor(score);
+  var myRank = RANKS[rankIdx];
+  document.getElementById("finalRank").textContent = myRank.name;
+  var nextEl = document.getElementById("finalNext");
+  if(rankIdx < RANKS.length-1){
+    var nextRank = RANKS[rankIdx+1];
+    nextEl.innerHTML = "次の通り名 <b>「"+nextRank.name+"」</b> まで あと <b>"+(nextRank.min-score).toLocaleString()+" 点</b>";
+  }else{
+    nextEl.textContent = "👑 最高位に到達！これ以上の通り名はない";
+  }
   document.getElementById("stSorted").textContent = sortedCount+" 匹";
   document.getElementById("stCombo").textContent = maxCombo+" 連続";
   document.getElementById("stAcc").textContent = judged? Math.round(correctCount/judged*100)+"%" : "—";
   document.getElementById("stTairyo").textContent = tairyoCount+" 回";
-  var shareText = "深海魚仕分けゲームで " + score.toLocaleString() + "点！最大" + maxCombo + "連続コンボで " + sortedCount + "匹仕分けたよ 🐟 南さつま市の深海魚（タカエビ・アカカサゴ・スミクイウオ）を仕分けたよ #深海魚 #南さつま市";
+  var shareText = "深海魚仕分けゲームで " + score.toLocaleString() + "点！通り名『" + myRank.name + "』を獲得！最大" + maxCombo + "連続コンボで " + sortedCount + "匹仕分けたよ 🐟 南さつま市の深海魚（タカエビ・アカカサゴ・スミクイウオ）を仕分けたよ #深海魚 #南さつま市";
   document.getElementById("btnShareX").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(shareText);
   document.getElementById("savedNote").style.display="none";
   document.getElementById("btnSaveScore").disabled = false;
@@ -1569,6 +1635,7 @@ document.addEventListener("DOMContentLoaded", function(){
   loadModels(function(){ refreshPreviews(); });
   if(HAS_THREE){ requestAnimationFrame(previewLoop); initGameScene(); }
   bindPointer();
+  renderTitleList();
   renderRank("rankStart","rankStartEmpty",5);
   requestAnimationFrame(loop);
 
